@@ -1,14 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getActiveTrainingBlock, getBlockReview, getCompletedSessions, getExerciseCatalog, initDB } from '@/lib/db'
+import {
+  getActiveRestrictions,
+  getActiveTrainingBlock,
+  getBlockReview,
+  getCompletedSessions,
+  getExerciseCatalog,
+  getRecentTrainingEvents,
+  initDB,
+} from '@/lib/db'
 
 export async function GET() {
   try {
     await initDB()
-    const [activeBlock, review, completedSessions, exerciseCatalog] = await Promise.all([
+    const [activeBlock, review, completedSessions, exerciseCatalog, recentEvents, activeRestrictions] = await Promise.all([
       getActiveTrainingBlock(),
       getBlockReview(),
       getCompletedSessions(),
       getExerciseCatalog(),
+      getRecentTrainingEvents(),
+      getActiveRestrictions(),
     ])
 
     return NextResponse.json({
@@ -16,6 +26,8 @@ export async function GET() {
       review,
       completedSessions,
       exerciseCatalog,
+      recentEvents,
+      activeRestrictions,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'

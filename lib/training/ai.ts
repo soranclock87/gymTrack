@@ -1,11 +1,20 @@
 import { buildBlockBlueprint, summarizeHistoryForPrompt } from '@/lib/training/planner'
-import type { BlockReview, ExerciseProgressPoint, TrainingBlockBlueprint } from '@/lib/training/types'
+import type {
+  ActiveRestriction,
+  BlockReview,
+  ExerciseProgressPoint,
+  TrainingBlockBlueprint,
+  Weekday,
+} from '@/lib/training/types'
 
 type CoachGenerationInput = {
   goal?: string
   weeks?: number
   startDate?: string
+  trainingDaysPerWeek?: number
+  preferredWeekdays?: Weekday[]
   historyMap: Record<string, ExerciseProgressPoint[]>
+  activeRestrictions?: ActiveRestriction[]
   review?: BlockReview | null
 }
 
@@ -97,7 +106,15 @@ function validateBlueprint(value: unknown): TrainingBlockBlueprint | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as TrainingBlockBlueprint
 
-  if (!candidate.title || !candidate.goal || !candidate.weeks || !candidate.startDate || !Array.isArray(candidate.sessions)) {
+  if (
+    !candidate.title ||
+    !candidate.goal ||
+    !candidate.weeks ||
+    !candidate.startDate ||
+    !candidate.trainingDaysPerWeek ||
+    !Array.isArray(candidate.preferredWeekdays) ||
+    !Array.isArray(candidate.sessions)
+  ) {
     return null
   }
 
@@ -110,6 +127,9 @@ export async function generateCoachBlock(input: CoachGenerationInput): Promise<{
       goal: input.goal,
       weeks: input.weeks,
       startDate: input.startDate,
+      trainingDaysPerWeek: input.trainingDaysPerWeek,
+      preferredWeekdays: input.preferredWeekdays,
+      activeRestrictions: input.activeRestrictions,
     },
     input.historyMap
   )
@@ -132,19 +152,25 @@ Genera un bloque de entrenamiento en JSON con estas propiedades exactas:
 - exercises: array de objetos con exerciseName, muscleGroup, orderIndex, targetSets, minReps, maxReps, targetRir, suggestedWeight y notes
 
 Restricciones:
-- Devuelve 4 sesiones por semana.
+- Devuelve exactamente ${input.trainingDaysPerWeek ?? 4} sesiones por semana.
 - Usa semanas numeradas desde 1.
 - Si hay signos de fatiga, mete descarga en la última semana.
 - Mantén nombres de ejercicios en español.
 - No inventes RM ni cargas absurdas.
 - generatedBy debe ser "ai".
+- Incluye los campos trainingDaysPerWeek y preferredWeekdays en el JSON.
 
 Objetivo: ${input.goal ?? 'Hipertrofia con progresión sostenible'}
 Semanas: ${input.weeks ?? 4}
 Fecha de inicio: ${input.startDate ?? new Date().toISOString().split('T')[0]}
+Días de entreno por semana: ${input.trainingDaysPerWeek ?? 4}
+Días preferidos: ${(input.preferredWeekdays ?? []).join(', ') || 'sin preferencia'}
 
 Histórico resumido:
 ${summarizeHistoryForPrompt(input.historyMap)}
+
+Restricciones activas:
+${input.activeRestrictions?.length ? JSON.stringify(input.activeRestrictions) : 'Sin restricciones activas'}
 
 Revisión del bloque previo:
 ${input.review ? JSON.stringify(input.review) : 'Sin revisión previa'}
@@ -168,6 +194,8 @@ ${input.review ? JSON.stringify(input.review) : 'Sin revisión previa'}
     }
 
     blueprint.generatedBy = 'ai'
+    blueprint.trainingDaysPerWeek = input.trainingDaysPerWeek ?? blueprint.trainingDaysPerWeek
+    blueprint.preferredWeekdays = input.preferredWeekdays ?? blueprint.preferredWeekdays
     return { blueprint, source: 'ai' }
   } catch {
     return { blueprint: fallback, source: 'rules' }

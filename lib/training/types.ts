@@ -13,6 +13,34 @@ export type BlockStatus = 'draft' | 'active' | 'completed' | 'archived'
 
 export type ProgressionDecision = 'increase' | 'hold' | 'decrease' | 'deload'
 
+export type Weekday =
+  | 'Lunes'
+  | 'Martes'
+  | 'Miércoles'
+  | 'Jueves'
+  | 'Viernes'
+  | 'Sábado'
+  | 'Domingo'
+
+export type SessionStatus = 'planned' | 'completed' | 'skipped' | 'adapted'
+
+export type SessionReason =
+  | 'fatiga'
+  | 'lesion'
+  | 'viaje'
+  | 'falta_de_tiempo'
+  | 'trabajo'
+  | 'otro'
+
+export type InjurySeverity = 'leve' | 'moderada' | 'alta'
+
+export type TrainingEventType = 'skip' | 'adaptation' | 'injury' | 'plan_reset' | 'plan_deleted'
+
+export type TrainingPreferences = {
+  trainingDaysPerWeek: number
+  preferredWeekdays: Weekday[]
+}
+
 export type ExerciseCatalogEntry = {
   id?: number
   name: string
@@ -37,14 +65,14 @@ export type PlannedExerciseInput = {
 export type PlannedSessionInput = {
   weekIndex: number
   dayIndex: number
-  dayLabel: string
+  dayLabel: Weekday
   title: string
   focus: string
   notes?: string | null
   exercises: PlannedExerciseInput[]
 }
 
-export type TrainingBlockBlueprint = {
+export type TrainingBlockBlueprint = TrainingPreferences & {
   title: string
   goal: string
   weeks: number
@@ -64,12 +92,12 @@ export type PlannedExercise = PlannedExerciseInput & {
 export type PlannedSession = Omit<PlannedSessionInput, 'exercises'> & {
   id: number
   blockId: number
-  status: 'planned' | 'completed' | 'skipped'
+  status: SessionStatus
   completedSessionId: number | null
   exercises: PlannedExercise[]
 }
 
-export type TrainingBlock = {
+export type TrainingBlock = TrainingPreferences & {
   id: number
   title: string
   goal: string
@@ -97,6 +125,12 @@ export type CompletedExerciseInput = {
   plannedExerciseId?: number | null
   exerciseName: string
   muscleGroup: MuscleGroup
+  adjustmentReason?: SessionReason | null
+  loadReductionPercent?: number | null
+  loadReductionKg?: number | null
+  injuryName?: string | null
+  injurySeverity?: InjurySeverity | null
+  restrictionUntil?: string | null
   notes?: string | null
   sets: CompletedSetInput[]
 }
@@ -104,8 +138,15 @@ export type CompletedExerciseInput = {
 export type CompletedSessionInput = {
   plannedSessionId?: number | null
   performedAt: string
+  sessionStatus: Exclude<SessionStatus, 'planned'>
+  reason?: SessionReason | null
   durationMinutes?: number | null
   energy?: number | null
+  injuryName?: string | null
+  injurySeverity?: InjurySeverity | null
+  restrictionUntil?: string | null
+  loadReductionPercent?: number | null
+  loadReductionKg?: number | null
   notes?: string | null
   exercises: CompletedExerciseInput[]
 }
@@ -122,6 +163,7 @@ export type ExerciseRecommendation = {
   nextWeight: number | null
   reason: string
   increment: number
+  protectedAdjustment?: boolean
 }
 
 export type BlockReview = {
@@ -129,4 +171,48 @@ export type BlockReview = {
   readiness: 'high' | 'moderate' | 'low'
   deloadRecommended: boolean
   actions: string[]
+}
+
+export type TrainingEvent = {
+  id: number
+  date: string
+  eventType: TrainingEventType
+  reason: SessionReason | null
+  sessionStatus: Exclude<SessionStatus, 'planned'> | null
+  exerciseName: string | null
+  injuryName: string | null
+  injurySeverity: InjurySeverity | null
+  restrictionUntil: string | null
+  loadReductionPercent: number | null
+  loadReductionKg: number | null
+  notes: string | null
+}
+
+export type ActiveRestriction = {
+  exerciseName: string | null
+  injuryName: string
+  injurySeverity: InjurySeverity | null
+  reason: SessionReason | null
+  restrictionUntil: string | null
+  notes: string | null
+  loadReductionPercent: number | null
+  loadReductionKg: number | null
+}
+
+export type CompletedSessionSummary = {
+  id: number
+  performedAt: string
+  title: string
+  dayLabel: string | null
+  sessionStatus: Exclude<SessionStatus, 'planned'>
+  reason: SessionReason | null
+  durationMinutes: number | null
+  energy: number | null
+  notes: string | null
+  injuryName: string | null
+  injurySeverity: InjurySeverity | null
+  restrictionUntil: string | null
+  loadReductionPercent: number | null
+  loadReductionKg: number | null
+  exercises: string[]
 }

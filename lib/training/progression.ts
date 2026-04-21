@@ -3,6 +3,8 @@ import type {
   CompletedSetInput,
   ExerciseRecommendation,
   ProgressionDecision,
+  SessionReason,
+  SessionStatus,
 } from '@/lib/training/types'
 
 type EvaluationInput = {
@@ -12,12 +14,19 @@ type EvaluationInput = {
   maxReps: number
   targetRir: number | null
   suggestedWeight: number | null
+  sessionStatus: Exclude<SessionStatus, 'planned'>
+  sessionReason?: SessionReason | null
+  loadReductionPercent?: number | null
+  loadReductionKg?: number | null
+  injuryName?: string | null
   sets: CompletedSetInput[]
 }
 
 type ReviewSignal = {
   decision: ProgressionDecision
   energy: number | null
+  sessionStatus: Exclude<SessionStatus, 'planned'>
+  protectedAdjustment: boolean
 }
 
 function getDefaultIncrement(exerciseName: string, weight: number | null) {
@@ -48,6 +57,24 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
   const workingSets = input.sets.filter((set) => !set.isWarmup)
   const increment = getDefaultIncrement(input.exerciseName, input.suggestedWeight)
   const baseWeight = input.suggestedWeight ?? average(workingSets.map((set) => set.weight)) ?? null
+  const protectedAdjustment =
+    input.sessionStatus === 'adapted' ||
+    Boolean(input.injuryName) ||
+    Boolean((input.loadReductionPercent ?? 0) > 0) ||
+    Boolean((input.loadReductionKg ?? 0) > 0) ||
+    input.sessionReason === 'lesion' ||
+    input.sessionReason === 'fatiga'
+
+  if (input.sessionStatus === 'skipped') {
+    return {
+      exerciseName: input.exerciseName,
+      decision: 'hold',
+      nextWeight: baseWeight,
+      reason: 'Sesión saltada: no se usa como señal de progreso ni de retroceso.',
+      increment,
+      protectedAdjustment: true,
+    }
+  }
 
   if (!workingSets.length) {
     return {
@@ -56,6 +83,7 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
       nextWeight: baseWeight,
       reason: 'No hay series efectivas registradas; mantén la carga hasta tener una referencia real.',
       increment,
+      protectedAdjustment,
     }
   }
 
@@ -71,6 +99,18 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
       nextWeight: null,
       reason: 'Sin referencia previa de peso; usa esta sesión como punto de partida.',
       increment,
+      protectedAdjustment,
+    }
+  }
+
+  if (protectedAdjustment) {
+    return {
+      exerciseName: input.exerciseName,
+      decision: 'hold',
+      nextWeight: roundToIncrement(baseWeight, increment),
+      reason: 'Sesión adaptada por fatiga o lesión: se conserva la referencia sin penalizar el seguimiento normal.',
+      increment,
+      protectedAdjustment: true,
     }
   }
 
@@ -85,6 +125,7 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
       nextWeight: roundToIncrement(baseWeight + increment, increment),
       reason: 'Has completado el rango alto con margen suficiente; toca subir ligeramente la carga.',
       increment,
+      protectedAdjustment: false,
     }
   }
 
@@ -95,6 +136,7 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
       nextWeight: roundToIncrement(Math.max(0, baseWeight - increment), increment),
       reason: 'La sesión quedó por debajo del objetivo o con demasiada fatiga; conviene bajar un paso.',
       increment,
+      protectedAdjustment: false,
     }
   }
 
@@ -104,24 +146,31 @@ export function evaluateExercisePerformance(input: EvaluationInput): ExerciseRec
     nextWeight: roundToIncrement(baseWeight, increment),
     reason: 'El rendimiento ha sido correcto pero todavía no justifica subir carga.',
     increment,
+    protectedAdjustment: false,
   }
 }
 
 export function reviewBlockProgress(signals: ReviewSignal[]): BlockReview {
+  const relevantSignals = signals.filter((signal) => signal.sessionStatus !== 'skipped')
   const energyValues = signals
     .map((signal) => signal.energy)
     .filter((value): value is number => value !== null && value !== undefined)
   const avgEnergy = average(energyValues) ?? 3
-  const decreases = signals.filter((signal) => signal.decision === 'decrease').length
-  const increases = signals.filter((signal) => signal.decision === 'increase').length
-  const totalSignals = signals.length || 1
+  const decreases = relevantSignals.filter((signal) => signal.decision === 'decrease' && !signal.protectedAdjustment).length
+  const increases = relevantSignals.filter((signal) => signal.decision === 'increase').length
+  const protectedSignals = relevantSignals.filter((signal) => signal.protectedAdjustment).length
+  const totalSignals = relevantSignals.length || 1
   const decreaseRatio = decreases / totalSignals
   const increaseRatio = increases / totalSignals
-  const deloadRecommended = decreaseRatio >= 0.35 || avgEnergy <= 2.2
+  const protectedRatio = protectedSignals / totalSignals
+  const deloadRecommended = decreaseRatio >= 0.35 || avgEnergy <= 2.2 || protectedRatio >= 0.4
 
   if (deloadRecommended) {
     return {
-      summary: 'Hay signos de fatiga acumulada. Conviene entrar en una semana de descarga antes del siguiente bloque.',
+      summary:
+        protectedRatio >= 0.4
+          ? 'El bloque ha tenido muchas adaptaciones por fatiga o lesión. Conviene proteger la siguiente fase con descarga y menor agresividad.'
+          : 'Hay signos de fatiga acumulada. Conviene entrar en una semana de descarga antes del siguiente bloque.',
       readiness: 'low',
       deloadRecommended: true,
       actions: [
@@ -146,7 +195,10 @@ export function reviewBlockProgress(signals: ReviewSignal[]): BlockReview {
   }
 
   return {
-    summary: 'La respuesta al bloque ha sido intermedia: mejor consolidar y progresar con ajustes pequeños.',
+    summary:
+      protectedSignals > 0
+        ? 'El bloque ha sido útil, pero hubo adaptaciones por fatiga o lesión. Mejor consolidar antes de volver a apretar.'
+        : 'La respuesta al bloque ha sido intermedia: mejor consolidar y progresar con ajustes pequeños.',
     readiness: 'moderate',
     deloadRecommended: false,
     actions: [
