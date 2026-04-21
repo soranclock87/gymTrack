@@ -43,4 +43,23 @@ npx vercel env pull .env.local
 npm run dev
 # → http://localhost:3000
 ```
+
+## IA local con Ollama
+Si quieres generar bloques con IA sin pagar API externa:
+
+```bash
+brew install --cask ollama
+open -a Ollama
+ollama pull qwen2.5:7b
+```
+
+Y usa este `.env.local`:
+
+```bash
+OPENAI_API_KEY=local
+OPENAI_BASE_URL=http://127.0.0.1:11434/v1
+OPENAI_MODEL=qwen2.5:7b
+```
+
+La app seguirá funcionando con reglas aunque Ollama no esté levantado, pero cuando esté disponible podrá proponer bloques con IA en local.
 # gymTrack
