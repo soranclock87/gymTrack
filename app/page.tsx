@@ -153,7 +153,7 @@ export default function Home() {
           return (
             <button key={i} onClick={() => setTab(i)} style={{ flex: 1, padding: '14px 8px', background: 'none', border: 'none', borderBottom: tab === i ? '2px solid #d63c2a' : '2px solid transparent', color: tab === i ? '#f5f2ee' : '#7a7a7a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 500, transition: 'color 0.2s' }}>
               <Icon size={14} />
-              <span style={{ display: window.innerWidth < 480 ? 'none' : 'inline' }}>{label}</span>
+              <span className="tab-label">{label}</span>
             </button>
           )
         })}

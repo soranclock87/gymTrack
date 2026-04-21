@@ -18,6 +18,8 @@ body {
 
 .font-bebas { font-family: 'Bebas Neue', sans-serif; }
 
+@media (max-width: 480px) { .tab-label { display: none; } }
+
 /* scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #141414; }
