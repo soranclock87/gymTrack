@@ -43,3 +43,4 @@ npx vercel env pull .env.local
 npm run dev
 # → http://localhost:3000
 ```
+# gymTrack
