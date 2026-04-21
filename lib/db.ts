@@ -87,8 +87,16 @@ function toNumber(value: string | number | null | undefined) {
   return null
 }
 
-function normalizeIsoDate(value: string) {
-  return value.split('T')[0]
+function normalizeIsoDate(value: string | Date | null | undefined) {
+  if (!value) return ''
+  if (value instanceof Date) return value.toISOString().split('T')[0]
+  if (typeof value === 'string') return value.split('T')[0]
+
+  if (typeof (value as { toISOString?: () => string }).toISOString === 'function') {
+    return (value as { toISOString: () => string }).toISOString().split('T')[0]
+  }
+
+  return String(value)
 }
 
 async function ensureExerciseCatalogEntry(name: string, muscleGroup: MuscleGroup) {
