@@ -93,7 +93,11 @@ function toChartDate(date: string) {
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init)
+  const method = init?.method?.toUpperCase() ?? 'GET'
+  const response = await fetch(url, {
+    cache: method === 'GET' ? 'no-store' : 'default',
+    ...init,
+  })
   const json = (await response.json()) as T & { error?: string }
   if (!response.ok) {
     throw new Error(json.error || 'Error de red')

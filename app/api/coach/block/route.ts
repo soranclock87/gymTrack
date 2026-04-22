@@ -10,6 +10,8 @@ import {
 } from '@/lib/db'
 import { generateCoachBlock } from '@/lib/training/ai'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     await initDB()
