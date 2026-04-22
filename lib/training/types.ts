@@ -50,6 +50,16 @@ export type ExerciseCatalogEntry = {
   isCompound?: boolean
 }
 
+export type ExerciseReference = {
+  requestedName: string
+  matchedName: string | null
+  description: string | null
+  imageUrl: string | null
+  category: string | null
+  equipment: string[]
+  source: 'wger'
+}
+
 export type PlannedExerciseInput = {
   exerciseName: string
   muscleGroup: MuscleGroup

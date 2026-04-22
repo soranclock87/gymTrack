@@ -20,6 +20,7 @@ import type {
   ActiveRestriction,
   BlockReview,
   CompletedSessionSummary,
+  ExerciseReference,
   SessionReason,
   TrainingBlock,
   TrainingEvent,
@@ -38,6 +39,9 @@ type OverviewResponse = {
 }
 type SaveResult = {
   recommendations?: Array<{ exerciseName: string; decision: string; nextWeight: number | null; reason: string }>
+}
+type ExerciseReferenceResponse = {
+  references: Record<string, ExerciseReference | null>
 }
 type SessionDraftSet = {
   setIndex: number
@@ -170,6 +174,7 @@ export default function Home() {
   const [historyExercise, setHistoryExercise] = useState('')
   const [historyData, setHistoryData] = useState<ExerciseHistoryRow[]>([])
   const [recommendations, setRecommendations] = useState<SaveResult['recommendations']>([])
+  const [exerciseReferences, setExerciseReferences] = useState<Record<string, ExerciseReference | null>>({})
 
   const [bwDate, setBwDate] = useState(today())
   const [bwWeight, setBwWeight] = useState('')
@@ -292,6 +297,37 @@ export default function Home() {
       loadExerciseHistory(exerciseOptions[0].exercise).catch(() => undefined)
     }
   }, [exerciseOptions, historyExercise, loadExerciseHistory])
+
+  useEffect(() => {
+    const names = Array.from(new Set(activeBlock?.sessions.flatMap((session) => session.exercises.map((exercise) => exercise.exerciseName)) ?? []))
+
+    if (!names.length) {
+      setExerciseReferences({})
+      return
+    }
+
+    let cancelled = false
+
+    fetchJson<ExerciseReferenceResponse>('/api/exercise-reference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ names }),
+    })
+      .then((data) => {
+        if (!cancelled) {
+          setExerciseReferences(data.references ?? {})
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setExerciseReferences({})
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeBlock])
 
   async function handleSaveWeight() {
     if (!bwWeight) return
@@ -686,19 +722,46 @@ export default function Home() {
                                   Semana {session.weekIndex} · {session.dayLabel} · {session.title}
                                 </div>
                                 <div style={{ fontSize: 12, color: '#7a7a7a' }}>{session.focus}</div>
+                                <div style={{ fontSize: 12, color: '#bcbcbc', marginTop: 6 }}>
+                                  {session.exercises.map((exercise) => exercise.exerciseName).join(' · ')}
+                                </div>
                               </div>
                               <span style={statusPill(session.status)}>{session.status}</span>
                             </div>
                             <div style={{ display: 'grid', gap: 8 }}>
-                              {session.exercises.map((exercise) => (
-                                <div key={exercise.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#d0d0d0', paddingBottom: 6, borderBottom: '1px solid #1f1f1f' }}>
-                                  <div>
-                                    <strong>{exercise.exerciseName}</strong> <span style={{ color: '#7a7a7a' }}>· {exercise.targetSets}x {exercise.minReps}-{exercise.maxReps}</span>
-                                    {exercise.notes ? <div style={{ color: '#ffca7a', marginTop: 4 }}>{exercise.notes}</div> : null}
+                              {session.exercises.map((exercise) => {
+                                const reference = exerciseReferences[exercise.exerciseName]
+
+                                return (
+                                  <div key={exercise.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#d0d0d0', paddingBottom: 10, borderBottom: '1px solid #1f1f1f' }}>
+                                    <div style={{ display: 'flex', gap: 12, flex: 1 }}>
+                                      {reference?.imageUrl ? (
+                                        <img
+                                          src={reference.imageUrl}
+                                          alt={reference.matchedName ?? exercise.exerciseName}
+                                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #2a2a2a', background: '#0f0f0f' }}
+                                        />
+                                      ) : null}
+                                      <div>
+                                        <strong>{exercise.exerciseName}</strong> <span style={{ color: '#7a7a7a' }}>· {exercise.targetSets}x {exercise.minReps}-{exercise.maxReps}</span>
+                                        {reference?.matchedName && reference.matchedName !== exercise.exerciseName ? (
+                                          <div style={{ color: '#8a8a8a', marginTop: 4 }}>Referencia API: {reference.matchedName}</div>
+                                        ) : null}
+                                        {reference?.description ? (
+                                          <div style={{ color: '#bcbcbc', marginTop: 4, lineHeight: 1.45 }}>{reference.description}</div>
+                                        ) : null}
+                                        {reference?.category || reference?.equipment.length ? (
+                                          <div style={{ color: '#8a8a8a', marginTop: 4 }}>
+                                            {[reference.category, reference.equipment.join(' · ')].filter(Boolean).join(' · ')}
+                                          </div>
+                                        ) : null}
+                                        {exercise.notes ? <div style={{ color: '#ffca7a', marginTop: 4 }}>{exercise.notes}</div> : null}
+                                      </div>
+                                    </div>
+                                    <div style={{ color: '#c8a84b', whiteSpace: 'nowrap' }}>{exercise.suggestedWeight ? `${exercise.suggestedWeight} kg` : 'Sin carga base'}</div>
                                   </div>
-                                  <div style={{ color: '#c8a84b' }}>{exercise.suggestedWeight ? `${exercise.suggestedWeight} kg` : 'Sin carga base'}</div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
                         ))}
