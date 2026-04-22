@@ -120,6 +120,11 @@ type TrainingEventRow = {
   notes: string | null
 }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __gymTrackerInitPromise: Promise<void> | undefined
+}
+
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === 'number') return value
   if (typeof value === 'string' && value !== '') return Number.parseFloat(value)
@@ -374,7 +379,7 @@ async function applyRecommendationsToFutureExercises(
   }
 }
 
-export async function initDB() {
+async function runInitDB() {
   await sql`
     CREATE TABLE IF NOT EXISTS body_weight (
       id SERIAL PRIMARY KEY,
@@ -549,6 +554,17 @@ export async function initDB() {
   await sql`ALTER TABLE completed_sets ADD COLUMN IF NOT EXISTS restriction_until DATE`
   await sql`ALTER TABLE completed_sets ADD COLUMN IF NOT EXISTS load_reduction_percent NUMERIC(5,2)`
   await sql`ALTER TABLE completed_sets ADD COLUMN IF NOT EXISTS load_reduction_kg NUMERIC(6,2)`
+}
+
+export async function initDB() {
+  if (!global.__gymTrackerInitPromise) {
+    global.__gymTrackerInitPromise = runInitDB().catch((error) => {
+      global.__gymTrackerInitPromise = undefined
+      throw error
+    })
+  }
+
+  await global.__gymTrackerInitPromise
 }
 
 export async function getBodyWeights() {

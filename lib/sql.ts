@@ -7,9 +7,9 @@ declare global {
 
 function getConnectionString() {
   return (
-    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
     process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
     ''
   )
 }
@@ -38,7 +38,9 @@ function createPool() {
   return new Pool({
     connectionString,
     ssl: isLocal ? false : { rejectUnauthorized: false },
-    max: 5,
+    max: 1,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000,
   })
 }
 
