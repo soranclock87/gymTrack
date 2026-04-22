@@ -131,6 +131,25 @@ function pickBestTranslation(exercise: WgerExerciseInfo, requestedName: string) 
   return best
 }
 
+function getSpanishTranslation(exercise: WgerExerciseInfo, requestedName: string) {
+  const spanishTranslations = (exercise.translations ?? []).filter(
+    (translation) => translation.language === SPANISH_LANGUAGE_ID && translation.name?.trim()
+  )
+
+  if (!spanishTranslations.length) return null
+
+  const bestSpanish = spanishTranslations.sort((a, b) => {
+    const scoreA = scoreNameMatch(requestedName, a.name ?? '')
+    const scoreB = scoreNameMatch(requestedName, b.name ?? '')
+    return scoreB - scoreA
+  })[0]
+
+  return {
+    name: bestSpanish.name?.trim() ?? null,
+    description: stripHtml(bestSpanish.description),
+  }
+}
+
 function buildReference(requestedName: string, exercises: WgerExerciseInfo[]): ExerciseReference | null {
   let best:
     | {
@@ -156,12 +175,13 @@ function buildReference(requestedName: string, exercises: WgerExerciseInfo[]): E
 
   if (!best || best.score < 24) return null
 
+  const spanishTranslation = getSpanishTranslation(best.exercise, requestedName)
   const image = best.exercise.images?.find((item) => item.is_main && item.image)?.image ?? best.exercise.images?.[0]?.image ?? null
 
   return {
     requestedName,
-    matchedName: best.matchedName,
-    description: best.description,
+    matchedName: spanishTranslation?.name ?? requestedName,
+    description: spanishTranslation?.description ?? null,
     imageUrl: image,
     category: best.exercise.category?.name ?? null,
     equipment: (best.exercise.equipment ?? []).map((item) => item.name?.trim()).filter((value): value is string => Boolean(value)),
